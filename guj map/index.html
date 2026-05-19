@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="gu">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ગરવી ગુજરાત - ઇન્ટરેક્ટિવ નકશો</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Gujarati:wght@400;600;700&display=swap" rel="stylesheet">
+
+<style>
+  * { font-family: 'Noto Sans Gujarati', sans-serif; box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    overflow-x: hidden;
+    background-color: #0a0a0a;
+    color: white;
+  }
+
+  /* ===== TRANSITION SCREENS ===== */
+  .screen {
+    position: absolute;
+    top: 0; left: 0; width: 100%; min-height: 100vh;
+    transition: opacity 0.8s ease-in-out, transform 0.8s ease-in-out;
+  }
+  .screen-hidden { opacity: 0; pointer-events: none; transform: scale(0.95); }
+  .screen-active { opacity: 1; pointer-events: all; transform: scale(1); }
+
+  /* ===== MAP STYLES ===== */
+  #map-screen {
+    background: radial-gradient(circle at top, #1a1a2e 0%, #050505 100%);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 40px 20px;
+  }
+
+  .map-container {
+    position: relative;
+    width: 100%;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+  /* WIKIMEDIA MAP STYLING */
+  .official-map {
+    width: 100%;
+    height: auto;
+    display: block;
+    filter: invert(1) sepia(0.5) hue-rotate(180deg) brightness(0.8) opacity(0.8) drop-shadow(0 0 20px rgba(0, 150, 255, 0.3));
+    user-select: none;
+    pointer-events: none;
+  }
+
+  /* Glowing Map Pins */
+  .map-pin {
+    position: absolute;
+    width: 16px; height: 16px;
+    background-color: #fbbf24;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    cursor: pointer;
+    transition: 0.3s;
+    box-shadow: 0 0 15px #fbbf24;
+    z-index: 10;
+  }
+
+  .map-pin::after {
+    content: ''; position: absolute;
+    top: -4px; left: -4px; right: -4px; bottom: -4px;
+    border-radius: 50%; border: 2px solid #fbbf24;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0% { transform: scale(0.8); opacity: 1; }
+    100% { transform: scale(2.5); opacity: 0; }
+  }
+
+  .map-pin:hover {
+    transform: translate(-50%, -50%) scale(1.5);
+    background-color: #fff; box-shadow: 0 0 30px #fff; z-index: 50;
+  }
+
+  /* Tooltip */
+  .map-pin .tooltip {
+    position: absolute; bottom: 25px; left: 50%; transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.9); color: #fbbf24;
+    padding: 6px 14px; border-radius: 8px; font-weight: bold; font-size: 15px;
+    white-space: nowrap; opacity: 0; pointer-events: none; transition: 0.3s ease;
+    border: 1px solid rgba(251, 191, 36, 0.5); box-shadow: 0 10px 20px rgba(0,0,0,0.8);
+  }
+  .map-pin:hover .tooltip { opacity: 1; bottom: 30px; }
+
+  /* ===== CITY DASHBOARD THEMES ===== */
+  #city-screen { transition: background-image 1s ease-in-out, background-color 1s ease; }
+  .theme-default { background: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.9)), url('gujarat_night_city_bg.jpg') center/cover fixed; }
+  .theme-travel { background: linear-gradient(rgba(15,32,39,0.8), rgba(44,83,100,0.95)), url('travel_scenery_bg.jpg') center/cover fixed; }
+  .theme-food { background: linear-gradient(rgba(62,31,13,0.85), rgba(0,0,0,0.95)), url('spices_restaurant_bg.jpg') center/cover fixed; }
+  .theme-culture { background: linear-gradient(rgba(59,10,69,0.85), rgba(0,0,0,0.95)), url('culture_festival_bg.jpg') center/cover fixed; }
+
+  /* ===== CARD STYLE ===== */
+  .glass { background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(15px); border: 1px solid rgba(255, 255, 255, 0.15); box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5); }
+  .button-style { padding: 12px 30px; border-radius: 30px; background: rgba(255, 255, 255, 0.1); color: white; font-weight: bold; border: 1px solid rgba(255,255,255,0.3); transition: 0.3s; cursor: pointer; }
+  .button-style:hover { transform: scale(1.05); background: white; color: black; }
+  .button-active { background: white; color: black; }
+
+  .back-btn { position: fixed; top: 20px; left: 20px; z-index: 100; padding: 10px 20px; background: rgba(0, 0, 0, 0.8); border: 1px solid #fbbf24; color: #fbbf24; border-radius: 30px; font-weight: bold; cursor: pointer; transition: 0.3s; backdrop-filter: blur(10px); }
+  .back-btn:hover { background: #fbbf24; color: black; }
+</style>
+</head>
+<body>
+
+<section id="map-screen" class="screen screen-active">
+  <div class="text-center mb-6 mt-10">
+    <h1 class="text-5xl md:text-7xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500 drop-shadow-lg mb-2">ગુજરાત દર્શન</h1>
+    <p class="text-lg opacity-90 text-yellow-200 tracking-wide">નકશા પર કોઈપણ શહેર પર ક્લિક કરો</p>
+  </div>
+
+  <div class="map-container relative">
+    
+    <img src="gujarat_map.svg" alt="Gujarat Map" class="official-map">
+    
+    <div class="map-pin" style="top: 36%; left: 25%;" onclick="openCityPage('bhuj', 'ભુજ')"><div class="tooltip">ભુજ</div></div>
+    <div class="map-pin" style="top: 56%; left: 14%;" onclick="openCityPage('dwarka', 'દ્વારકા')"><div class="tooltip">દ્વારકા</div></div>
+    <div class="map-pin" style="top: 68%; left: 25%;" onclick="openCityPage('porbandar', 'પોરબંદર')"><div class="tooltip">પોરબંદર</div></div>
+    <div class="map-pin" style="top: 52%; left: 31%;" onclick="openCityPage('jamnagar', 'જામનગર')"><div class="tooltip">જામનગર</div></div>
+    <div class="map-pin" style="top: 54%; left: 43%;" onclick="openCityPage('rajkot', 'રાજકોટ')"><div class="tooltip">રાજકોટ</div></div>
+    <div class="map-pin" style="top: 70%; left: 37%;" onclick="openCityPage('junagadh', 'જૂનાગઢ')"><div class="tooltip">જૂનાગઢ</div></div>
+    <div class="map-pin" style="top: 82%; left: 37%;" onclick="openCityPage('somnath', 'સોમનાથ')"><div class="tooltip">સોમનાથ</div></div>
+    <div class="map-pin" style="top: 66%; left: 63%;" onclick="openCityPage('bhavnagar', 'ભાવનગર')"><div class="tooltip">ભાવનગર</div></div>
+    
+    <div class="map-pin" style="top: 40%; left: 69%;" onclick="openCityPage('ahmedabad', 'અમદાવાદ')"><div class="tooltip">અમદાવાદ</div></div>
+    <div class="map-pin" style="top: 36%; left: 71%;" onclick="openCityPage('gandhinagar', 'ગાંધીનગર')"><div class="tooltip">ગાંધીનગર</div></div>
+    <div class="map-pin" style="top: 54%; left: 80%;" onclick="openCityPage('vadodara', 'વડોદરા')"><div class="tooltip">વડોદરા</div></div>
+    <div class="map-pin" style="top: 78%; left: 74%;" onclick="openCityPage('surat', 'સુરત')"><div class="tooltip">સુરત</div></div>
+    
+  </div>
+
+  <div class="mt-6 text-sm text-gray-500 opacity-70 font-mono text-center">
+    Map By Chumwa and KCVelaga (CC BY-SA 4.0) | Wikimedia Commons<br>
+    Coordinates digitally mapped for accuracy.
+  </div>
+</section>
+
+<section id="city-screen" class="screen screen-hidden theme-default pt-24 pb-32">
+  
+  <button class="back-btn" onclick="closeCityPage()">← નકશા પર પાછા</button>
+
+  <div class="text-center mb-12">
+    <h2 id="cityTitle" class="text-6xl md:text-8xl font-bold mb-8 text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-400 drop-shadow-md tracking-wider"></h2>
+    
+    <div class="flex justify-center gap-6 flex-wrap px-4">
+      <button id="btn-travel" class="button-style text-lg md:text-xl" onclick="showSection('travel')">જોવા લાયક સ્થળો (6)</button>
+      <button id="btn-food" class="button-style text-lg md:text-xl" onclick="showSection('food')">વાનગીઓ (6)</button>
+      <button id="btn-culture" class="button-style text-lg md:text-xl" onclick="showSection('culture')">સંસ્કૃતિ (6)</button>
+    </div>
+  </div>
+
+  <div class="max-w-7xl mx-auto px-6">
+    <h3 id="categoryTitle" class="text-2xl md:text-3xl font-bold mb-10 text-center border-b border-white/30 pb-4 inline-block mx-auto text-yellow-400"></h3>
+    <div id="dynamicContent" class="grid md:grid-cols-3 gap-8"></div>
+  </div>
+
+</section>
+
+<script>
+let selectedCity = "";
+
+/* ===== 12 CITIES DATA ===== */
+const cityData = {
+  ahmedabad: {
+    travel: [
+      {title:"સાબરમતી રિવરફ્રન્ટ", img:"sabarmati_riverfront.jpg", desc:"નદીકિનારે શાંતિપૂર્વક ચાલવા માટેનું સ્થળ."},
+      {title:"ગાંધી આશ્રમ", img:"gandhi_ashram.jpg", desc:"મહાત્મા ગાંધીનું નિવાસસ્થાન અને શાંતિનું પ્રતીક."},
+      {title:"અડાલજની વાવ", img:"adalaj_ni_vav.jpg", desc:"પ્રાચીન વાસ્તુકલાનું અદભુત પાંચ માળનું ઉદાહરણ."},
+      {title:"કાંકરિયા તળાવ", img:"kankaria_lake.jpg", desc:"પરિવાર સાથે ફરવા માટે આકર્ષક લેકફ્રન્ટ."},
+      {title:"સાયન્સ સિટી", img:"science_city_ahmedabad.jpg", desc:"રોબોટિક્સ અને એક્વાટિક ગેલેરીથી સજ્જ."},
+      {title:"સીદી સૈયદની જાળી", img:"sidi_saiyyed_jali.jpg", desc:"અમદાવાદની ઓળખ સમાન ઝીણી પથ્થરની કોતરણી."}
+    ],
+    food: [
+      {title:"ખમણ", img:"khaman.jpg", desc:"સ્વાદ: હળવા, નરમ અને સ્વાદમાં થોડા મીઠા-તીખા."},
+      {title:"ફાફડા જલેબી", img:"fafda_jalebi.jpg", desc:"સ્વાદ: ગરમાગરમ ક્રિસ્પી ફાફડા અને ગળી રસદાર જલેબી."},
+      {title:"હાંડવો", img:"handvo.jpg", desc:"સ્વાદ: બહારથી ક્રિસ્પી અને અંદરથી સોફ્ટ નમકીન કેક."},
+      {title:"પાત્રા", img:"patra.jpg", desc:"સ્વાદ: ખાટા, મીઠા અને તીખા મસાલાનો અદભુત ટેસ્ટ."},
+      {title:"દાળવડા", img:"dalvada.jpg", desc:"સ્વાદ: વરસાદમાં ખાવા માટે બેસ્ટ, બહારથી કડક અને તીખા."},
+      {title:"મોહનથાળ", img:"mohanthal.jpg", desc:"સ્વાદ: શુદ્ધ ઘી અને બેસનથી બનતી પ્રખ્યાત મીઠાઈ."}
+    ],
+    culture: [
+      {title:"ઉત્તરાયણ (પતંગ મહોત્સવ)", img:"uttarayan_kite_festival.jpg", desc:"રંગબેરંગી પતંગોથી છવાતું આકાશ."},
+      {title:"હેરિટેજ વોક", img:"heritage_walk_pol.jpg", desc:"લાકડાની કોતરણીવાળી પ્રાચીન પોળોની મુલાકાત."},
+      {title:"નવરાત્રી ગરબા", img:"navratri_garba.jpg", desc:"વિશ્વનો સૌથી લાંબો નૃત્ય મહોત્સવ."},
+      {title:"કાપડ ઉદ્યોગ", img:"textile_industry_ahmedabad.jpg", desc:"ભારતનું માન્ચેસ્ટર તરીકે જાણીતો કાપડ વારસો."},
+      {title:"રથયાત્રા", img:"rath_yatra_ahmedabad.jpg", desc:"ભગવાન જગન્નાથની ભવ્ય અને ઐતિહાસિક રથયાત્રા."},
+      {title:"ગુજરાતી સાહિત્ય", img:"gujarati_sahitya_parishad.jpg", desc:"ગુજરાતી ભાષા અને સાહિત્યનું મુખ્ય કેન્દ્ર."}
+    ]
+  },
+  surat: {
+    travel: [ {title:"ડુમસ બીચ", img:"dumas_beach.jpg", desc:"કાળી રેતીવાળો દરિયાકિનારો."}, {title:"ગોપી તળાવ", img:"gopi_talav.jpg", desc:"ઐતિહાસિક તળાવ અને બોટિંગ સેન્ટર."}, {title:"ડચ ગાર્ડન", img:"dutch_garden_surat.jpg", desc:"પ્રાચીન ડચ મકબરા અને સુંદર બગીચો."}, {title:"સુરત કેસલ", img:"surat_castle.jpg", desc:"16મી સદીનો તાપી નદી કિનારે આવેલો કિલ્લો."}, {title:"સાયન્સ સેન્ટર", img:"science_center_surat.jpg", desc:"મ્યુઝિયમ, પ્લેનેટોરિયમ અને આર્ટ ગેલેરી."}, {title:"સુવાલી બીચ", img:"suvali_beach.jpg", desc:"શાંત અને સ્વચ્છ રમણીય દરિયાકિનારો."} ],
+    food: [ {title:"સુરતી ઉંધીયું", img:"surti_undhiyu.jpg", desc:"સ્વાદ: તાજા લીલા શાકભાજી અને મુઠિયાનું મિક્સ શાક."}, {title:"સુરતી લોચો", img:"surti_locho.jpg", desc:"સ્વાદ: ચણાની દાળનો ગરમ અને ઢીલો મસાલેદાર નાસ્તો."}, {title:"ઘારી", img:"surti_ghari.jpg", desc:"સ્વાદ: શુદ્ધ ઘી અને ડ્રાયફ્રુટ્સથી ભરેલી પ્રીમિયમ મીઠાઈ."}, {title:"કોલ્ડ કોકો", img:"cold_coco_surat.jpg", desc:"સ્વાદ: એકદમ ઘટ્ટ, ઠંડુ અને ચોકલેટી પીણું."}, {title:"રસવાળા ખમણ", img:"rasawala_khaman.jpg", desc:"સ્વાદ: ખમણ પર ખાટો-મીઠો અને તીખો મસાલેદાર રસો."}, {title:"આલુપુરી", img:"alupuri_surat.jpg", desc:"સ્વાદ: સુરતની ખાસ સ્ટ્રીટ ફૂડ આઈટમ, તીખી અને ચટપટી."} ],
+    culture: [ {title:"ડાયમંડ ઉદ્યોગ", img:"diamond_cutting_surat.jpg", desc:"વિશ્વના 90% હીરા અહીં પોલિશ થાય છે."}, {title:"ટેક્સટાઇલ માર્કેટ", img:"textile_market_surat.jpg", desc:"ભારતનું સૌથી મોટું સિલ્ક અને સાડી માર્કેટ."}, {title:"ચંદી પડવો", img:"chandi_padvo_festival.jpg", desc:"શરદ પૂનમ પછી ઘારી ખાવાનો ખાસ ઉત્સવ."}, {title:"સુરતી બોલી", img:"surti_language.jpg", desc:"મીઠી અને મજાકિયા સુરતી ભાષા."}, {title:"તાપી નદી પૂજન", img:"tapi_river_worship.jpg", desc:"સૂર્યપુત્રી તાપી નદીનું સાંસ્કૃતિક મહત્વ."}, {title:"નર્મદ સાહિત્ય", img:"kavi_narmad_house.jpg", desc:"કવિ નર્મદનું જન્મસ્થળ અને કર્મભૂમિ."} ]
+  },
+  vadodara: {
+    travel: [ {title:"લક્ષ્મી વિલાસ પેલેસ", img:"laxmi_vilas_palace.jpg", desc:"ભારતનો સૌથી મોટો મહેલ."}, {title:"સયાજી બાગ", img:"sayaji_baug.jpg", desc:"વિશાળ ગાર્ડન."}, {title:"ચાંપાનેર પાવાગઢ", img:"champaner_pavagadh.jpg", desc:"વર્લ્ડ હેરિટેજ સાઇટ."}, {title:"ઇએમઇ ટેમ્પલ", img:"eme_temple_vadodara.jpg", desc:"એલ્યુમિનિયમનું મંદિર."}, {title:"સુરસાગર તળાવ", img:"sursagar_lake.jpg", desc:"શહેરની મધ્યમાં શિવ પ્રતિમા."}, {title:"બરોડા મ્યુઝિયમ", img:"baroda_museum.jpg", desc:"પ્રાચીન સંગ્રહાલય."} ],
+    food: [ {title:"સેવ ઉસળ", img:"sev_usal.jpg", desc:"તીખો મસાલેદાર નાસ્તો."}, {title:"લીલો ચેવડો", img:"lilo_chevdo.jpg", desc:"બટાકાનો મીઠો-તીખો ચેવડો."}, {title:"ભાખરવડી", img:"bhakharwadi.jpg", desc:"ખાટી મીઠી ક્રિસ્પી વાનગી."}, {title:"મહાકાળી સેવ ઉસળ", img:"mahakali_sev_usal.jpg", desc:"પ્રખ્યાત બ્રાન્ડ."}, {title:"ફરાળી મિસળ", img:"farali_misal.jpg", desc:"ઉપવાસ માટે ખાસ."}, {title:"દૂધ કોલ્ડ્રિંક", img:"dudh_colddrink_vadodara.jpg", desc:"વડોદરાનું ખાસ મિલ્કશેક."} ],
+    culture: [ {title:"યુનાઈટેડ વે ગરબા", img:"united_way_garba.jpg", desc:"વિશ્વ વિખ્યાત ગરબા."}, {title:"ફાઈન આર્ટ્સ ફેકલ્ટી", img:"fine_arts_ms_university.jpg", desc:"કલાનું કેન્દ્ર."}, {title:"ગાયકવાડ વારસો", img:"gaekwad_history.jpg", desc:"મરાઠા શાસનની ઝલક."}, {title:"સંસ્કારી નગરી", img:"sanskari_nagari.jpg", desc:"શિક્ષણ અને સંસ્કાર."}, {title:"નવલખી વાવ", img:"navlakhi_vav.jpg", desc:"પ્રાચીન વાવ."}, {title:"કલા નગરી", img:"kala_nagari.jpg", desc:"ચિત્રકારોનું હબ."} ]
+  },
+  rajkot: {
+    travel: [ {title:"વોટસન મ્યુઝિયમ", img:"watson_museum.jpg", desc:"ઐતિહાસિક મ્યુઝિયમ."}, {title:"પ્રદ્યુમન પાર્ક ઝૂ", img:"pradyuman_park_zoo.jpg", desc:"આધુનિક ઝૂ."}, {title:"રોટરી ડોલ્સ મ્યુઝિયમ", img:"rotary_dolls_museum.jpg", desc:"ઢીંગલીઓનો સંગ્રહ."}, {title:"ન્યારી ડેમ", img:"nyari_dam.jpg", desc:"સુંદર પિકનિક સ્પોટ."}, {title:"કાબા ગાંધીનો ડેલો", img:"kaba_gandhi_no_delo.jpg", desc:"ગાંધીજીનું ઘર."}, {title:"આજી ડેમ", img:"aji_dam_rajkot.jpg", desc:"રાજકોટની જીવાદોરી."} ],
+    food: [ {title:"કાઠિયાવાડી થાળી", img:"kathiyawadi_thali.jpg", desc:"શુદ્ધ દેશી જમણ."}, {title:"રાજકોટના પેંડા", img:"rajkot_peda.jpg", desc:"દૂધના મુલાયમ પેંડા."}, {title:"ચટણીવાળા ફાફડા", img:"chutney_fafda_rajkot.jpg", desc:"તીખી કઢી સાથે ફાફડા."}, {title:"ગોરડના ગાંઠિયા", img:"gorad_ganthiya.jpg", desc:"પ્રખ્યાત ગાંઠિયા."}, {title:"ઘૂઘરા", img:"rajkot_ghughra.jpg", desc:"તીખા મસાલાવાળા ઘૂઘરા."}, {title:"આઈસ્ક્રીમ ગોલા", img:"icecream_gola_rajkot.jpg", desc:"ઉનાળાની શાન."} ],
+    culture: [ {title:"ચા અને ડાયરો", img:"lok_dayro_rajkot.jpg", desc:"લોક ડાયરાની રમઝટ."}, {title:"સોની બજાર", img:"soni_bazar_rajkot.jpg", desc:"ચાંદીના દાગીના."}, {title:"કાઠિયાવાડી બોલી", img:"kathiyawadi_language.jpg", desc:"રજવાડી ભાષા."}, {title:"સાંજની ફરવા જવાની પ્રથા", img:"race_course_rajkot.jpg", desc:"રેસકોર્સ રોડની મજા."}, {title:"એન્જિનિયરિંગ હબ", img:"engineering_hub_rajkot.jpg", desc:"ઉદ્યોગ નગરી."}, {title:"ગાંધીજીનું બાળપણ", img:"gandhi_childhood.jpg", desc:"ઐતિહાસિક વારસો."} ]
+  },
+  dwarka: {
+    travel: [ {title:"દ્વારકાધીશ મંદિર", img:"dwarkadhish_temple.jpg", desc:"કૃષ્ણનું જગતમંદિર."}, {title:"શિવરાજપુર બીચ", img:"shivrajpur_beach.jpg", desc:"બ્લુ ફ્લેગ બીચ."}, {title:"બેટ દ્વારકા", img:"bet_dwarka.jpg", desc:"ટાપુ પરનું મંદિર."}, {title:"નાગેશ્વર જ્યોતિર્લિંગ", img:"nageshwar_jyotirlinga.jpg", desc:"૧૨ જ્યોતિર્લિંગમાંથી એક."}, {title:"રુક્મિણી મંદિર", img:"rukmini_temple.jpg", desc:"પ્રાચીન મંદિર."}, {title:"ગોમતી ઘાટ", img:"gomti_ghat.jpg", desc:"પવિત્ર નદીનો ઘાટ."} ],
+    food: [ {title:"મંદિરનો પ્રસાદ", img:"mandir_prasad_dwarka.jpg", desc:"સાત્વિક ભોજન."}, {title:"દ્વારકા થાળી", img:"dwarka_gujarati_thali.jpg", desc:"લસણ ડુંગળી વગરની થાળી."}, {title:"મગનો શીરો", img:"mag_no_shiro.jpg", desc:"પવિત્ર અને મીઠો."}, {title:"ખારી શીંગ", img:"khari_shing_dwarka.jpg", desc:"સ્થાનિક નાસ્તો."}, {title:"ફાફડા", img:"fafda_dwarka.jpg", desc:"સવારનો નાસ્તો."}, {title:"માવાના પેંડા", img:"mava_peda_dwarka.jpg", desc:"ભગવાનનો ભોગ."} ],
+    culture: [ {title:"ધજા ચઢાવવાની પ્રથા", img:"dhaja_arohan_dwarka.jpg", desc:"૫૨ ગજની ધજા."}, {title:"ગોમતી આરતી", img:"gomti_aarti.jpg", desc:"સાંજની પવિત્ર આરતી."}, {title:"કૃષ્ણ ભક્તિ", img:"krishna_bhakti.jpg", desc:"જય રણછોડના નારા."}, {title:"જન્માષ્ટમી", img:"janmashtami_dwarka.jpg", desc:"સૌથી મોટો તહેવાર."}, {title:"સંત સંમેલન", img:"sadhu_dwarka.jpg", desc:"સાધુ સંતોની ભૂમિ."}, {title:"અહીર સંસ્કૃતિ", img:"ahir_culture.jpg", desc:"સ્થાનિક પરંપરા."} ]
+  },
+  bhuj: {
+    travel: [ {title:"સફેદ રણ", img:"white_rann_kutch.jpg", desc:"મીઠાનું રણ."}, {title:"આઈના મહેલ", img:"aina_mahal_bhuj.jpg", desc:"કાચનો રાજાશાહી મહેલ."}, {title:"કાળો ડુંગર", img:"kalo_dungar.jpg", desc:"કચ્છનો સૌથી ઉંચો પોઇન્ટ."}, {title:"પ્રાગ મહેલ", img:"prag_mahal.jpg", desc:"ઇટાલિયન ગોથિક વાસ્તુકલા."}, {title:"સ્વામિનારાયણ મંદિર", img:"swaminarayan_temple_bhuj.jpg", desc:"ભવ્ય આરસનું મંદિર."}, {title:"માંડવી બીચ", img:"mandvi_beach.jpg", desc:"કચ્છનો સુંદર બીચ."} ],
+    food: [ {title:"કચ્છી દાબેલી", img:"kutchi_dabeli.jpg", desc:"તીખી-મીઠી દાબેલી."}, {title:"કચ્છી કડક", img:"kutchi_kadak.jpg", desc:"રસ અને રસાનો મસાલો."}, {title:"મેસુબ પાક", img:"mesub_pak.jpg", desc:"ઘીની મીઠાઈ."}, {title:"ગુલાબ પાક", img:"gulab_pak.jpg", desc:"કચ્છની ખાસ મીઠાઈ."}, {title:"ખારી મઠરી", img:"khari_mathri.jpg", desc:"ચા સાથે નો નાસ્તો."}, {title:"બાજરાનો રોટલો", img:"bajra_rotlo_kutch.jpg", desc:"દેશી જમણ."} ],
+    culture: [ {title:"રણ ઉત્સવ", img:"rann_utsav.jpg", desc:"સફેદ રણનો મહોત્સવ."}, {title:"કચ્છી ભરતકામ", img:"kutchi_embroidery.jpg", desc:"વિશ્વવિખ્યાત આભલા વર્ક."}, {title:"બાંધણી", img:"bandhani_kutch.jpg", desc:"રંગબેરંગી કચ્છી બાંધણી."}, {title:"કચ્છી બોલી", img:"kutchi_language.jpg", desc:"અલગ જ મીઠી ભાષા."}, {title:"ભૂંગા", img:"bhunga_architecture.jpg", desc:"ભૂકંપ પ્રૂફ ગોળ ઘરો."}, {title:"માલધારી સંસ્કૃતિ", img:"maldhari_culture.jpg", desc:"પશુપાલન અને પરંપરા."} ]
+  },
+  bhavnagar: {
+    travel: [ {title:"તખ્તેશ્વર મહાદેવ", img:"takhteshwar_mahadev.jpg", desc:"ટેકરી પરનું શિવ મંદિર."}, {title:"વેળાવદર નેશનલ પાર્ક", img:"velavadar_blackbuck.jpg", desc:"કાળિયાર હરણનું અભયારણ્ય."}, {title:"નિષ્કલંક મહાદેવ", img:"nishkalank_mahadev.jpg", desc:"દરિયામાં આવેલું શિવલિંગ."}, {title:"પાલીતાણા મંદિરો", img:"palitana_temples.jpg", desc:"જૈનોનું મહાતીર્થ."}, {title:"બોર તળાવ", img:"bor_talav.jpg", desc:"શહેરનું સુંદર તળાવ."}, {title:"ખોડિયાર માતા મંદિર", img:"khodiyar_mata_rajpara.jpg", desc:"પવિત્ર યાત્રાધામ."} ],
+    food: [ {title:"ભાવનગરી ગાંઠિયા", img:"bhavnagari_ganthiya.jpg", desc:"સોફ્ટ અને પ્રખ્યાત ગાંઠિયા."}, {title:"પાવ ગાંઠિયા", img:"pav_ganthiya.jpg", desc:"તીખી ચટણી સાથે."}, {title:"પેંડા અને થાબડી", img:"thabdi_peda.jpg", desc:"દૂધની શાનદાર મીઠાઈ."}, {title:"ભરેલા મરચાં", img:"bharela_marcha.jpg", desc:"ગાંઠિયા સાથે ખવાતા મરચાં."}, {title:"લીલી ડુંગળીનું શાક", img:"lili_dungri_shak.jpg", desc:"શિયાળાની ખાસ વાનગી."}, {title:"અડદિયા", img:"adadiya_bhavnagar.jpg", desc:"પૌષ્ટિક શિયાળુ મીઠાઈ."} ],
+    culture: [ {title:"અલંગ શિપ બ્રેકિંગ", img:"alang_shipyard.jpg", desc:"વિશ્વનું સૌથી મોટું શિપ યાર્ડ."}, {title:"સાહિત્યિક વારસો", img:"zhaverchand_meghani.jpg", desc:"ઝવેરચંદ મેઘાણીની ભૂમિ."}, {title:"શિક્ષણ નગરી", img:"education_bhavnagar.jpg", desc:"સંસ્કારી નગરી."}, {title:"રજવાડી વારસો", img:"gohilwad_history.jpg", desc:"ગોહિલવાડ નો ઇતિહાસ."}, {title:"જૈન સંસ્કૃતિ", img:"jain_culture_palitana.jpg", desc:"પાલીતાણા તીર્થ પ્રભાવ."}, {title:"કાઠિયાવાડી આતિથ્ય", img:"kathiyawadi_hospitality.jpg", desc:"મહેમાનગતિ."} ]
+  },
+  junagadh: {
+    travel: [ {title:"ગિરનાર પર્વત", img:"girnar_mountain.jpg", desc:"ગુજરાતનો સૌથી ઉંચો પર્વત."}, {title:"ઉપરકોટ ફોર્ટ", img:"uparkot_fort.jpg", desc:"પ્રાચીન કિલ્લો."}, {title:"મહાબત મકબરો", img:"mahabat_maqbara.jpg", desc:"અદભુત વાસ્તુકલા."}, {title:"સક્કરબાગ ઝૂ", img:"sakkarbaug_zoo.jpg", desc:"સિંહો માટે પ્રખ્યાત."}, {title:"અશોકનો શિલાલેખ", img:"ashoka_edicts_junagadh.jpg", desc:"મૌર્ય કાળનો ઇતિહાસ."}, {title:"દામોદર કુંડ", img:"damodar_kund.jpg", desc:"પવિત્ર સ્નાન કુંડ."} ],
+    food: [ {title:"અડદિયા પાક", img:"adadiya_pak_junagadh.jpg", desc:"ઘી થી ભરપૂર મીઠાઈ."}, {title:"કાઠિયાવાડી રોટલો", img:"kathiyawadi_rotlo.jpg", desc:"ચૂલા પર બનેલો રોટલો."}, {title:"રીંગણનો ઓળો", img:"ringan_no_olo.jpg", desc:"સ્મોકી સ્વાદવાળું શાક."}, {title:"માખણ અને ગોળ", img:"makhan_gol.jpg", desc:"શુદ્ધ કાઠિયાવાડી સાઇડ ડીશ."}, {title:"લીંબુ સોડા", img:"limbu_soda_girnar.jpg", desc:"ગિરનાર ચડ્યા પછીની સોડા."}, {title:"ગીરની કેસર કેરી", img:"gir_kesar_mango.jpg", desc:"વિશ્વવિખ્યાત કેરી."} ],
+    culture: [ {title:"ભવનાથનો મેળો", img:"bhavnath_mela.jpg", desc:"મહાશિવરાત્રીનો નાગા બાવાઓનો મેળો."}, {title:"ગીરના સિંહો", img:"asiatic_lions_gir.jpg", desc:"એશિયાટિક સિંહનું ઘર."}, {title:"પરિક્રમા", img:"girnar_parikrama.jpg", desc:"ગિરનારની લીલી પરિક્રમા."}, {title:"નરસિંહ મહેતા", img:"narsinh_mehta_choro.jpg", desc:"આદિકવિની કર્મભૂમિ."}, {title:"નવાબી ઇતિહાસ", img:"junagadh_nawab.jpg", desc:"જૂનાગઢ સ્ટેટનો વારસો."}, {title:"સાધુઓનું પિયર", img:"girnar_sadhus.jpg", desc:"ગિરનાર સાધુઓની ભૂમિ."} ]
+  },
+  jamnagar: {
+    travel: [ {title:"લાખોટા તળાવ", img:"lakhota_lake.jpg", desc:"મ્યુઝિયમ અને પેલેસ."}, {title:"મરીન નેશનલ પાર્ક", img:"marine_national_park.jpg", desc:"જીવંત પરવાળા અને ઓક્ટોપસ."}, {title:"બાલા હનુમાન મંદિર", img:"bala_hanuman_temple.jpg", desc:"અખંડ રામધૂન (ગીનીસ રેકોર્ડ)."}, {title:"ખીજડિયા અભયારણ્ય", img:"khijadiya_bird_sanctuary.jpg", desc:"વિદેશી પક્ષીઓનું સ્વર્ગ."}, {title:"પ્રતાપ વિલાસ પેલેસ", img:"pratap_vilas_palace.jpg", desc:"રજવાડી મહેલ."}, {title:"ભૂચર મોરી", img:"bhuchar_mori.jpg", desc:"ઐતિહાસિક યુદ્ધભૂમિ."} ],
+    food: [ {title:"ડ્રાયફ્રુટ કચોરી", img:"dryfruit_kachori.jpg", desc:"ખાટી-મીઠી મસાલેદાર કચોરી."}, {title:"જામનગરના ઘૂઘરા", img:"jamnagar_ghughra.jpg", desc:"તીખા અને ચટપટા ઘૂઘરા."}, {title:"જામનગરી પાન", img:"jamnagari_paan.jpg", desc:"જમ્યા પછી ખાવા માટે પ્રખ્યાત પાન."}, {title:"ભજીયા", img:"bhajiya_jamnagar.jpg", desc:"વરસાદમાં ખવાતા ગરમ ભજીયા."}, {title:"રોટલો ને શાક", img:"rotlo_shak_jamnagar.jpg", desc:"દેશી જમણ."}, {title:"મીઠાઈઓ", img:"mava_mithai_jamnagar.jpg", desc:"શુદ્ધ માવાની મીઠાઈ."} ],
+    culture: [ {title:"છોટી કાશી", img:"chhoti_kashi_jamnagar.jpg", desc:"અસંખ્ય મંદિરોની નગરી."}, {title:"બ્રાસ પાર્ટ્સ ઉદ્યોગ", img:"brass_parts_jamnagar.jpg", desc:"પિત્તળના પાર્ટ્સ માટે પ્રખ્યાત."}, {title:"જામનગરી બાંધણી", img:"bandhani_jamnagar.jpg", desc:"સુંદર સાડીઓ અને દુપટ્ટા."}, {title:"જામ સાહેબનો વારસો", img:"jam_saheb_history.jpg", desc:"રજવાડી ઇતિહાસ."}, {title:"આયુર્વેદ યુનિવર્સિટી", img:"ayurveda_university_jamnagar.jpg", desc:"પ્રથમ આયુર્વેદિક યુનિવર્સિટી."}, {title:"રિલાયન્સ રિફાઇનરી", img:"reliance_refinery_jamnagar.jpg", desc:"વિશ્વની સૌથી મોટી રિફાઇનરી."} ]
+  },
+  somnath: {
+    travel: [ {title:"સોમનાથ મંદિર", img:"somnath_temple.jpg", desc:"પ્રથમ જ્યોતિર્લિંગ."}, {title:"ભાલકા તીર્થ", img:"bhalka_tirth.jpg", desc:"જ્યાં કૃષ્ણ ભગવાનને તીર વાગ્યું હતું."}, {title:"સોમનાથ બીચ", img:"somnath_beach.jpg", desc:"મંદિર પાછળનો સુંદર દરિયાકિનારો."}, {title:"ત્રિવેણી સંગમ", img:"triveni_sangam.jpg", desc:"ત્રણ નદીઓનો પવિત્ર સંગમ."}, {title:"ગીતા મંદિર", img:"gita_mandir_somnath.jpg", desc:"આરસના પથ્થર પર ગીતાના શ્લોકો."}, {title:"પ્રભાસ પાટણ મ્યુઝિયમ", img:"prabhas_patan_museum.jpg", desc:"જૂના મંદિરના અવશેષો."} ],
+    food: [ {title:"સોમનાથ પ્રસાદ", img:"somnath_prasad.jpg", desc:"ભગવાનને ધરાવાતો થાળ."}, {title:"નારિયેળ પાણી", img:"coconut_water.jpg", desc:"દરિયાકિનારાનું તાજું પાણી."}, {title:"કાઠિયાવાડી ભોજન", img:"kathiyawadi_food_somnath.jpg", desc:"શુદ્ધ દેશી જમણ."}, {title:"ભજીયા", img:"somnath_bhajiya.jpg", desc:"તીખા અને ગરમ."}, {title:"ફાફડા", img:"somnath_fafda.jpg", desc:"સવારનો નાસ્તો."}, {title:"માવા પેંડા", img:"mava_peda_somnath.jpg", desc:"માવા પેંડા."} ],
+    culture: [ {title:"શિવ ભક્તિ", img:"shiv_bhakti.jpg", desc:"હર હર મહાદેવનો નાદ."}, {title:"લાઇટ એન્ડ સાઉન્ડ શો", img:"light_sound_show_somnath.jpg", desc:"મંદિરના ઇતિહાસનું પ્રદર્શન."}, {title:"સોમનાથ ટ્રસ્ટ", img:"somnath_trust.jpg", desc:"ધાર્મિક વ્યવસ્થાપન."}, {title:"કૃષ્ણ નિર્વાણ ભૂમિ", img:"krishna_nirvan.jpg", desc:"પ્રભાસ પાટણનું મહત્વ."}, {title:"યાત્રાળુઓનું કેન્દ્ર", img:"somnath_yatri.jpg", desc:"આખા ભારતમાંથી આવતા દર્શનાર્થીઓ."}, {title:"સમુદ્ર પૂજન", img:"samudra_pujan.jpg", desc:"અરબી સમુદ્રનું મહત્વ."} ]
+  },
+  porbandar: {
+    travel: [ {title:"કીર્તિ મંદિર", img:"kirti_mandir.jpg", desc:"મહાત્મા ગાંધીજીનું જન્મસ્થળ."}, {title:"ચોપાટી બીચ", img:"chowpati_beach_porbandar.jpg", desc:"પોરબંદરનો પ્રખ્યાત બીચ."}, {title:"સુદામા મંદિર", img:"sudama_mandir.jpg", desc:"કૃષ્ણના મિત્ર સુદામાનું એકમાત્ર મંદિર."}, {title:"પક્ષી અભયારણ્ય", img:"bird_sanctuary_porbandar.jpg", desc:"શહેરની મધ્યમાં આવેલું બર્ડ સેન્ચ્યુરી."}, {title:"તારા મંદિર", img:"tara_mandir_planetarium.jpg", desc:"બાળકો માટે વિજ્ઞાન કેન્દ્ર."}, {title:"હર્ષદ માતા મંદિર", img:"harshad_mata_temple.jpg", desc:"દરિયાકિનારે આવેલું પ્રાચીન મંદિર."} ],
+    food: [ {title:"ખાજલી", img:"khajli_porbandar.jpg", desc:"પોરબંદરની પ્રખ્યાત ક્રિસ્પી મીઠાઈ."}, {title:"સાટા", img:"sata_sweet.jpg", desc:"ગળી અને કડક મીઠાઈ."}, {title:"ખારી મઠરી", img:"khari_mathri_porbandar.jpg", desc:"ચા સાથેનો લોકલ નાસ્તો."}, {title:"કાઠિયાવાડી થાળી", img:"kathiyawadi_thali_porbandar.jpg", desc:"ઓળો અને રોટલો."}, {title:"ભજીયા", img:"bhajiya_porbandar.jpg", desc:"દરિયાકિનારે ખાવાની મજા."}, {title:"આઈસ્ક્રીમ", img:"icecream_porbandar.jpg", desc:"ઉનાળાની ખાસિયત."} ],
+    culture: [ {title:"સુદામાપુરી", img:"sudamapuri.jpg", desc:"મિત્રતાની નગરી."}, {title:"ગાંધીજીના સંસ્કાર", img:"gandhi_values.jpg", desc:"અહિંસાની ભૂમિ."}, {title:"ખારવા સમાજ", img:"kharva_samaj.jpg", desc:"દરિયાખેડુ સંસ્કૃતિ."}, {title:"માછીમારી ઉદ્યોગ", img:"fishing_industry.jpg", desc:"બંદરની ઓળખ."}, {title:"મેર રાસ", img:"mer_raas.jpg", desc:"સ્થાનિક લોકનૃત્ય."}, {title:"વ્હાઇટ સિટી", img:"white_stone_architecture.jpg", desc:"ચૂનાના પથ્થરનું બાંધકામ."} ]
+  },
+  gandhinagar: {
+    travel: [ {title:"અક્ષરધામ મંદિર", img:"akshardham_temple_gandhinagar.jpg", desc:"અદ્ભુત પથ્થરની કોતરણીવાળું ભવ્ય મંદિર."}, {title:"દાંડી કુટીર", img:"dandi_kutir.jpg", desc:"ગાંધીજીના જીવન પર આધારિત થ્રીડી મ્યુઝિયમ."}, {title:"ઇન્દ્રોડા પાર્ક", img:"indroda_nature_park.jpg", desc:"ભારતનો જુરાસિક પાર્ક અને પ્રાણી સંગ્રહાલય."}, {title:"મહાત્મા મંદિર", img:"mahatma_mandir.jpg", desc:"વિશાળ કન્વેન્શન સેન્ટર."}, {title:"ગિફ્ટ સિટી", img:"gift_city_gandhinagar.jpg", desc:"ભારતનું પ્રથમ સ્માર્ટ અને ફાઇનાન્સિયલ સિટી."}, {title:"સરિતા ઉદ્યાન", img:"sarita_udyan.jpg", desc:"સાબરમતી કિનારે આવેલો સુંદર બગીચો."} ],
+    food: [ {title:"અમૂલ પ્રોડક્ટ્સ", img:"amul_products.jpg", desc:"દૂધ, છાશ અને આઈસ્ક્રીમ."}, {title:"સાત્વિક ગુજરાતી થાળી", img:"satvik_gujarati_thali.jpg", desc:"શુદ્ધ અને ઓછા મસાલાવાળું જમણ."}, {title:"ચોળાફળી", img:"cholafali.jpg", desc:"તીખી અને ક્રિસ્પી વાનગી."}, {title:"ખમણ-ઢોકળા", img:"khaman_dhokla_gandhinagar.jpg", desc:"સવારનો નાસ્તો."}, {title:"દાળ-ભાત", img:"dal_bhat.jpg", desc:"ગુજરાતી જમણની શાન."}, {title:"ભજિયા", img:"bhajiya_gandhinagar.jpg", desc:"સાંજના સમયનો નાસ્તો."} ],
+    culture: [ {title:"ગ્રીન સિટી", img:"green_city_gandhinagar.jpg", desc:"એશિયાનું સૌથી હરિયાળું શહેર."}, {title:"વહીવટી કેન્દ્ર", img:"capital_of_gujarat.jpg", desc:"ગુજરાતનું પાટનગર અને રાજકીય કેન્દ્ર."}, {title:"આધુનિક આયોજન", img:"sector_planning.jpg", desc:"સેક્ટરમાં વહેંચાયેલું શિસ્તબદ્ધ શહેર."}, {title:"શિક્ષણ સંસ્થાઓ", img:"education_institutes_gandhinagar.jpg", desc:"NID, NIFT અને IIT જેવી સંસ્થાઓ."}, {title:"વાઇબ્રન્ટ ગુજરાત", img:"vibrant_gujarat_summit.jpg", desc:"આંતરરાષ્ટ્રીય બિઝનેસ સમિટ."}, {title:"શાંતિપૂર્ણ જીવન", img:"peaceful_lifestyle.jpg", desc:"અમદાવાદની ભીડથી દૂર શાંત વાતાવરણ."} ]
+  }
+};
+
+/* ===== APP LOGIC ===== */
+
+function openCityPage(cityKey, gujaratiName) {
+  selectedCity = cityKey;
+  
+  document.getElementById("map-screen").classList.remove("screen-active");
+  document.getElementById("map-screen").classList.add("screen-hidden");
+  
+  document.getElementById("city-screen").classList.remove("screen-hidden");
+  document.getElementById("city-screen").classList.add("screen-active");
+  
+  document.getElementById("cityTitle").innerText = gujaratiName;
+  
+  showSection('travel');
+  window.scrollTo(0,0);
+}
+
+function closeCityPage() {
+  document.getElementById("city-screen").classList.remove("screen-active");
+  document.getElementById("city-screen").classList.add("screen-hidden");
+  
+  document.getElementById("map-screen").classList.remove("screen-hidden");
+  document.getElementById("map-screen").classList.add("screen-active");
+  window.scrollTo(0,0);
+}
+
+function getDynamicLink(title, type) {
+  if (type === "travel") return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(title + " Gujarat")}`;
+  if (type === "food") return `https://www.youtube.com/results?search_query=${encodeURIComponent(title + " recipe in gujarati")}`;
+  if (type === "culture") return `https://www.google.com/search?q=${encodeURIComponent(title + " વિશે માહિતી ગુજરાત")}`;
+  return "#";
+}
+
+function showSection(type) {
+  const screen = document.getElementById("city-screen");
+  screen.className = "screen screen-active"; 
+  if(type === "travel") screen.classList.add("theme-travel");
+  if(type === "food") screen.classList.add("theme-food");
+  if(type === "culture") screen.classList.add("theme-culture");
+
+  resetButtons();
+  document.getElementById("btn-" + type).classList.add("button-active");
+
+  const titles = { travel: "જોવા લાયક સ્થળો", food: "પ્રખ્યાત વાનગીઓ", culture: "સ્થાનિક સંસ્કૃતિ" };
+  document.getElementById("categoryTitle").innerText = titles[type];
+
+  const content = cityData[selectedCity][type] || [];
+  let html = "";
+  
+  let actionText = type === "travel" ? "📍 નકશા પર જુઓ" : type === "food" ? "🍲 રેસીપી વિડીયો" : "📖 ગૂગલ પર વાંચો";
+
+  content.forEach(item => {
+    const externalLink = getDynamicLink(item.title, type);
+    html += `
+    <a href="${externalLink}" target="_blank" class="content-card glass rounded-2xl overflow-hidden p-5 flex flex-col h-full hover:border-yellow-400/50 transition duration-300 group block cursor-pointer text-left">
+      <div class="overflow-hidden h-48 mb-4 rounded-xl shadow-lg relative bg-black/50 flex items-center justify-center">
+        <img src="${item.img}" onerror="this.src='https://via.placeholder.com/400x300/222/FFF?text='+encodeURIComponent('${item.title}')" class="h-full w-full object-cover">
+        <div class="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition duration-300">
+          <span class="bg-yellow-500 text-black px-4 py-2 rounded-full font-bold text-sm shadow-xl">${actionText}</span>
+        </div>
+      </div>
+      <h3 class="font-bold text-2xl mb-2 text-yellow-300 group-hover:underline decoration-yellow-300">${item.title}</h3>
+      <p class="text-base opacity-90 leading-relaxed text-gray-100 flex-grow">${item.desc}</p>
+    </a>`;
+  });
+  
+  document.getElementById("dynamicContent").innerHTML = html;
+}
+
+function resetButtons() {
+  document.getElementById("btn-travel").classList.remove("button-active");
+  document.getElementById("btn-food").classList.remove("button-active");
+  document.getElementById("btn-culture").classList.remove("button-active");
+}
+</script>
+
+</body>
+</html>
